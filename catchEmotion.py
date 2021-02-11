@@ -1,86 +1,56 @@
 import numpy as np
 import pandas as pd
+# import matplotlib.pyplot as plt
+import time
+import re
+import os
+import requests
+import argparse
+import dlib
 import cv2
 import imutils
-import dlib
+import statistics as stat
+
+from __future__ import division
+from time import sleep
+from math import isclose
+from collections import OrderedDict
 from scipy.ndimage import zoom
 from scipy.spatial import distance
 from scipy import ndimage
-from scipy import stats
 from imutils import face_utils
 from tensorflow.keras.models import load_model
-from tensorflow import keras
+from tensorflow.keras import backend as K
 
+
+#global variables
 shape_x = 48
 shape_y = 48
-input_shape = (shape_x, shape_y, 1)
-nClasses = 7
-thresh = 0.25
-frame_check = 20
 
-def eye_aspect_ratio(eye):
-        A = distance.euclidean(eye[1], eye[5])
-        B = distance.euclidean(eye[2], eye[4])
-        C = distance.euclidean(eye[0], eye[3])
-        ear = (A + B) / (2.0 * C)
-        return ear
 
-def detect_face(frame):
-        #Cascade classifier pre-trained model
-        cascPath = 'Models/face_landmarks.dat'
-        faceCascade = cv2.CascadeClassifier(cascPath)
-        #BGR -> Gray conversion
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        #Cascade MultiScale classifier
-        detected_faces = faceCascade.detectMultiScale(gray,scaleFactor=1.1,minNeighbors=6,
-                                                      minSize=(shape_x, shape_y),
-                                                      flags=cv2.CASCADE_SCALE_IMAGE)
-        coord = []
-                                              
-        for x, y, w, h in detected_faces :
-            if w > 100 :
-                sub_img=frame[y:y+h,x:x+w]
-                cv2.rectangle(frame,(x,y),(x+w,y+h),(0, 255,255),1)
-                coord.append([x,y,w,h])
-
-        return gray, detected_faces, coord
-
-def extract_face_features(faces, offset_coefficients=(0.075, 0.05)):
-        gray = faces[0]
-        detected_face = faces[1]
-        
-        new_face = []
-        
-        for det in detected_face :
-            x, y, w, h = det
-            horizontal_offset = np.int(np.floor(offset_coefficients[0] * w))
-            vertical_offset = np.int(np.floor(offset_coefficients[1] * h))
-            extracted_face = gray[y+vertical_offset:y+h, x+horizontal_offset:x-horizontal_offset+w]
-            new_extracted_face = zoom(extracted_face, (shape_x / extracted_face.shape[0],shape_y / extracted_face.shape[1]))
-            new_extracted_face = new_extracted_face.astype(np.float32)
-            new_extracted_face /= float(new_extracted_face.max())
-            new_face.append(new_extracted_face)
-        return new_face
-
-def catch_emotion():
-    (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
-    (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
-    (nStart, nEnd) = face_utils.FACIAL_LANDMARKS_IDXS["nose"]
-    (mStart, mEnd) = face_utils.FACIAL_LANDMARKS_IDXS["mouth"]
-    (jStart, jEnd) = face_utils.FACIAL_LANDMARKS_IDXS["jaw"]
-    (eblStart, eblEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eyebrow"]
-    (ebrStart, ebrEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eyebrow"]
-    model = load_model('Models/video.h5', compile=False)
-    optimizer = keras.optimizers.Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    model.compile(optimizer=optimizer,loss='sparse_categorical_crossentropy',metrics=['accuracy'])
+def catchEmotion():
+    model = load_model('Models/video.h5')
     face_detect = dlib.get_frontal_face_detector()
     predictor_landmarks  = dlib.shape_predictor("Models/face_landmarks.dat")
     video_capture = cv2.VideoCapture(0)
-    final_result = []
-    counter = 10
-    while True:
-        if(counter<=0):
-            break
+    predictions = []
+    
+    global k
+    k = 0
+    end = 0
+    max_time = 10
+    start = time.time()
+    angry_0 = []
+    disgust_1 = []
+    fear_2 = []
+    happy_3 = []
+    sad_4 = []
+    surprise_5 = []
+    neutral_6 = []
+    
+    while end - start < max_time :
+        k = k+1
+        end = time.time()
         ret, frame = video_capture.read()
         face_index = 0
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -95,15 +65,75 @@ def catch_emotion():
             face /= float(face.max())
             face = np.reshape(face.flatten(), (1, 48, 48, 1))
             prediction = model.predict(face)
+            
+            angry_0.append(prediction[0][0].astype(float))
+            disgust_1.append(prediction[0][1].astype(float))
+            fear_2.append(prediction[0][2].astype(float))
+            happy_3.append(prediction[0][3].astype(float))
+            sad_4.append(prediction[0][4].astype(float))
+            surprise_5.append(prediction[0][5].astype(float))
+            neutral_6.append(prediction[0][6].astype(float))
+            
             prediction_result = np.argmax(prediction)
-            if(prediction_result>0):
-                counter = counter - 1
-                final_result.append(prediction_result) 
-    final = np.array(final_result)
-    result = int(stats.mode(final)[0])
-    emotion = {0:'Angry',1:'Disgust',2:'Fear',3:'Happy',4:'Sad',5:'Surprise',6:'Neutral'}
-    video_capture.release()
-    cv2.destroyAllWindows()
-    return emotion[result]
+            predictions.append(str(prediction_result))
+            
+        if end-start > max_time - 1 :
+            with open("histo_perso.txt", "w") as d:
+                d.write("density"+'\n')
+                for val in predictions :
+                    d.write(str(val)+'\n')
+                
+            with open("histo.txt", "a") as d:
+                for val in predictions :
+                    d.write(str(val)+'\n')
+               
+            rows = zip(angry_0,disgust_1,fear_2,happy_3,sad_4,surprise_5,neutral_6)
 
-print(catch_emotion())
+            import csv
+            with open("prob.csv", "w") as d:
+                writer = csv.writer(d)
+                for row in rows:
+                    writer.writerow(row)
+         
+
+            with open("prob_tot.csv", "a") as d:
+                writer = csv.writer(d)
+                for row in rows:
+                    writer.writerow(row)
+          
+            K.clear_session()
+            break
+    pleasant = ((stat.mean(happy_3)+stat.mean(surprise_5))/2 + stat.mean(neutral_6))/2
+    unPleasant = ((stat.mean(angry_0)+stat.mean(disgust_1)+stat.mean(fear_2)+stat.mean(sad_4))/4 + stat.mean(neutral_6)) /2
+    calm = ((stat.mean(sad_4)+stat.mean(disgust_1))/2 + stat.mean(neutral_6))/2
+    energized = ((stat.mean(happy_3)+stat.mean(surprise_5)+stat.mean(fear_2)+stat.mean(angry_0))/4 + stat.mean(neutral_6))/2
+
+#     plt.bar(('Pleasant','Unpleasant','Calm','Energized'),[
+#         pleasant,
+#         unPleasant,
+#         calm,
+#         energized
+#     ])
+#     plt.show()
+
+    
+    goodNBad = 0
+    if (isclose(pleasant, unPleasant, abs_tol=1e-2)):
+        goodNBad = 0
+    elif pleasant > unPleasant:
+        goodNBad = 1
+    else:
+        goodNBad = -1
+    
+    energy = 0
+    if (isclose(calm, energized, abs_tol=1e-2)):
+        energy = 0
+    elif energized > calm:
+        energy = 1
+    else:
+        energy = -1
+        
+    mood = (goodNBad,energy)
+    print(predictions)
+    video_capture.release()
+    return(mood)
