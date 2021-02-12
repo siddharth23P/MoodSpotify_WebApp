@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+from __future__ import division
 import numpy as np
 import pandas as pd
 # import matplotlib.pyplot as plt
@@ -11,7 +17,6 @@ import cv2
 import imutils
 import statistics as stat
 
-from __future__ import division
 from time import sleep
 from math import isclose
 from collections import OrderedDict
@@ -21,14 +26,13 @@ from scipy import ndimage
 from imutils import face_utils
 from tensorflow.keras.models import load_model
 from tensorflow.keras import backend as K
-
-
 #global variables
 shape_x = 48
 shape_y = 48
 
 
-def catchEmotion():
+
+def main():
     model = load_model('Models/video.h5')
     face_detect = dlib.get_frontal_face_detector()
     predictor_landmarks  = dlib.shape_predictor("Models/face_landmarks.dat")
@@ -81,14 +85,13 @@ def catchEmotion():
             with open("histo_perso.txt", "w") as d:
                 d.write("density"+'\n')
                 for val in predictions :
-                    d.write(str(val)+'\n')
+                  d.write(str(val)+'\n')
                 
             with open("histo.txt", "a") as d:
                 for val in predictions :
                     d.write(str(val)+'\n')
                
             rows = zip(angry_0,disgust_1,fear_2,happy_3,sad_4,surprise_5,neutral_6)
-
             import csv
             with open("prob.csv", "w") as d:
                 writer = csv.writer(d)
@@ -123,7 +126,7 @@ def catchEmotion():
     elif pleasant > unPleasant:
         goodNBad = 1
     else:
-        goodNBad = -1
+        goodNBad = 2
     
     energy = 0
     if (isclose(calm, energized, abs_tol=1e-2)):
@@ -131,9 +134,16 @@ def catchEmotion():
     elif energized > calm:
         energy = 1
     else:
-        energy = -1
+        energy = 2
         
-    mood = (goodNBad,energy)
-    print(predictions)
     video_capture.release()
-    return(mood)
+    print(goodNBad,flush=True,sep='')
+    print(energy,flush=True,sep='')
+
+
+# In[4]:
+
+if __name__ == '__main__':
+    main()
+
+
