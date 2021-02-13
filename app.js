@@ -33,8 +33,8 @@ const scopes = [
 
 const spotifyApi = new SpotifyWebApi({
     redirectUri: 'http://localhost:8888/callback',
-    clientId: '8c8099f005164e54ae1ae0d956d12743',
-    clientSecret: '289b49bcee894ebe99347e34eb5abf19'
+    clientId: '<your client id>',
+    clientSecret: '<your client secret id>'
 });
 
 // var access_token = ''
@@ -114,35 +114,19 @@ app.get('/playlist', async (req, res) => {
     console.log(userid);
     var topTracks = [];
     var trackFeatures = [];
-    // var x = 0;
-    // for (x = 0; x < 50; x++) {
-    // topTracks.push(await getTopTracks(x));
-    // console.log(x);
-    // }
     topTracks = await getTopTracks();
     console.log(topTracks.length, ' users top tracks')
     var topArtists = await getTopArtists();
     console.log(topArtists.length, ' users top artists');
     for (artist of topArtists) {
-        // console.log('For artist: ', artist);
         topTracks = await getTopArtistTracks(artist, topTracks);
     }
     console.log(topTracks.length, `users top artist's tracks`);
-    // for (track of topTracks) {
-    //     trackFeatures = await getTrackFeat(track, trackFeatures);
-    // }
     for (let i = 0; i < topTracks.length; i += 100) {
         let trackIds = topTracks.slice(i, Math.min(topTracks.length, i + 100));
         trackFeatures = await getTrackFeat(trackIds, trackFeatures);
     }
     console.log(trackFeatures.length, ' number of tracks with features');
-    // res.send('OK');
-    // for (track in topTracks) {
-    //     trackFeatures.push(await getTrackFeat(track));
-    //     console.log(`----------------${track}-------------------------`)
-    //     console.log(track);
-    // }
-    // console.log(trackFeatures);
     const playlistname = await generateTime();
     const playlistid = await createMyPlaylist(playlistname, {
         'description': playlistname,
@@ -152,23 +136,16 @@ app.get('/playlist', async (req, res) => {
     trackURIs = []
     aftersorttracks = trackFeatures;
     py = spawn('python', ['catchEmotion.py']);
-    // var moods = "";
-    // var moods = [];
-    // var moodstemp = "";
     moods = "";
     py.stdout.on('data', function (data) {
         console.log('Pipe data from python script ...');
         var daa = data;
         moods += (daa.toString('utf8'));
-        // moods.push(data);
     });
     py.stdout.on('end', function () {
-        // moods = moodstemp;
         console.log('Moods', moods, moods.length);
         aftersorttracks = sortByValence(aftersorttracks);
-        // console.log(aftersorttracks.length, ' : ', aftersorttracks);
         aftersorttracks = sortByDanceabilityAndEnergy(aftersorttracks);
-        // console.log(aftersorttracks.length, ' : ', aftersorttracks);
         for (track of aftersorttracks) {
             trackURIs.push(track.uri);
         }
@@ -177,47 +154,26 @@ app.get('/playlist', async (req, res) => {
             let trackURIsliced = trackURIs.slice(i, Math.min(trackURIs.length, i + 100));
             addTracksToPlaylist(playlistid, trackURIsliced);
         }
-        // addTracksToPlaylist(playlistid, trackURIs);
-        // res.send(`On playlist route ${playlistid}`);
         res.render('player', {
             playlistid
         })
     });
 })
 
-// app.get('/play', (req, res) => {
-//     res.send('Playing');
-// })
-
 async function generateTime() {
     let date_ob = new Date();
-
-    // current date
-    // adjust 0 before single digit date
     let date = ("0" + date_ob.getDate()).slice(-2);
-
-    // current month
     let month = ("0" + (date_ob.getMonth() + 1)).slice(-2);
-
-    // current year
     let year = date_ob.getFullYear();
-
-    // current hours
     let hours = date_ob.getHours();
-
-    // current minutes
     let minutes = date_ob.getMinutes();
-
-    // current seconds
     let seconds = date_ob.getSeconds();
-
     return year + "-" + month + "-" + date + " " + hours + ":" + minutes + ":" + seconds;
 }
 
 async function getMyData() {
     try {
         const myData = await spotifyApi.getMe();
-        // console.log(myData.body);
         return myData.body.id;
     } catch (e) {
         console.log(e);
@@ -226,11 +182,8 @@ async function getMyData() {
 }
 async function getTrackFeat(topTracks, trackFeatures) {
     try {
-        // let trackFeatures = []
-        // const data = await spotifyApi.getAudioFeaturesForTrack(x.id);
         const data = await spotifyApi.getAudioFeaturesForTracks(topTracks);
         const tracks = data.body.audio_features;
-        // console.log(tracks);
         for (track of tracks) {
             if (track === null) {
                 continue;
@@ -241,7 +194,6 @@ async function getTrackFeat(topTracks, trackFeatures) {
                 danceability,
                 energy
             } = track;
-            // console.log(uri, valence, danceability, energy);
             trackFeatures.push({
                 uri: uri,
                 valence: valence,
@@ -250,22 +202,10 @@ async function getTrackFeat(topTracks, trackFeatures) {
             })
         }
         return trackFeatures;
-        // const {
-        //     uri,
-        //     valence,
-        //     danceability,
-        //     energy
-        // } = data.body;
-        // topTracks = {
-        //     uri: uri,
-        //     valence: valence,
-        //     danceability: danceability,
-        //     energy: energy
-        // };
-        // return topTracks
+       
     } catch (e) {
         console.log(e);
-        // return []
+ 
         return trackFeatures;
     }
 }
@@ -329,9 +269,7 @@ async function getTopArtists() {
 }
 
 async function getTopArtistTracks(topArtist, topTracks) {
-    // spotifyApi.getArtistTopTracks(topArtist, 'IN')
-    //     .then(data => console.log(data.body))
-    //     .catch(e => console.log(e));
+  
     try {
         const data = await spotifyApi.getArtistTopTracks(topArtist, 'IN');
         const tracks = data.body.tracks;
@@ -384,11 +322,6 @@ function sortByDanceabilityAndEnergy(x) {
     return x;
 }
 
-
-
-// app.listen(8888, () => {
-//     console.log('Listening on port 8888');
-// })
 
 app.listen(8888, () =>
     console.log(
