@@ -137,8 +137,9 @@ def main():
         energy = 2
         
     video_capture.release()
-    print(goodNBad,flush=True,sep='')
-    print(energy,flush=True,sep='')
+    # print(goodNBad,flush=True,sep='')
+    # print(energy,flush=True,sep='')
+    print(goodNBad, energy, sep=',')
 
 
 # In[4]:

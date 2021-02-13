@@ -1,512 +1,397 @@
-const express = require('express');
-const app = express();
+const SpotifyWebApi = require('spotify-web-api-node');
+const express = require('express')
+const {
+    spawn
+} = require('child_process');
+const {
+    totalmem
+} = require('os');
 const path = require('path');
-const axios = require('axios');
-const request = require('request');
-const fetch = require('node-fetch');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
-const querystring = require('querystring');
-const {
-    json
-} = require('express');
-const {
-    mainModule
-} = require('process');
+const app = express()
 
-const client_id = '8c8099f005164e54ae1ae0d956d12743'; // Your client id
-const client_secret = '289b49bcee894ebe99347e34eb5abf19'; // Your secret
-const redirect_uri = 'http://localhost:8888/callback'; // Your redirect uri
-var uris = ''
-// MongoDB
-var MongoClient = require('mongodb').MongoClient;
-const e = require('express');
-// Connection URI
-const uri =
-  "mongodb+srv://Serpent23P:Adisid@2323@cluster0.n7fnu.mongodb.net/test";
+const scopes = [
+    'ugc-image-upload',
+    'user-read-playback-state',
+    'user-modify-playback-state',
+    'user-read-currently-playing',
+    'streaming',
+    'app-remote-control',
+    'user-read-email',
+    'user-read-private',
+    'playlist-read-collaborative',
+    'playlist-modify-public',
+    'playlist-read-private',
+    'playlist-modify-private',
+    'user-library-modify',
+    'user-library-read',
+    'user-top-read',
+    'user-read-playback-position',
+    'user-read-recently-played',
+    'user-follow-read',
+    'user-follow-modify'
+];
 
-var access_token = ''
-var refresh_token = ''
-var track = ''
+const spotifyApi = new SpotifyWebApi({
+    redirectUri: 'http://localhost:8888/callback',
+    clientId: '8c8099f005164e54ae1ae0d956d12743',
+    clientSecret: '289b49bcee894ebe99347e34eb5abf19'
+});
 
-/**
- * Generates a random string containing numbers and letters
- * @param  {number} length The length of the string
- * @return {string} The generated string
- */
-
-var generateRandomString = function (length) {
-    var text = '';
-    var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
-    for (var i = 0; i < length; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
-};
-
-var stateKey = 'spotify_auth_state';
-
-const getTopTracks = async function () {
-    // let topTracks = []
-    // let options = {
-    //     url: 'https://api.spotify.com/v1/me/top/tracks?limit=50',
-    //     headers: {
-    //         'Authorization': 'Bearer ' + access_token
-    //     },
-    //     json: true
-    // };
-
-    const response = await fetch('https://api.spotify.com/v1/me/top/tracks', {
-        method: 'GET',
-        headers: {
-            'Authorization': 'Bearer ' + access_token
-        }
-    })
-    const data = await response.json();
-    return data;
-
-}
-
-var getTopArtists = async function () {
-    // let topArtists = []
-    // let options = {
-    //     url: 'https://api.spotify.com/v1/me/top/artists?limit=50',
-    //     headers: {
-    //         'Authorization': 'Bearer ' + access_token
-    //     },
-    //     json: true
-    // };
-    const response = await fetch('https://api.spotify.com/v1/me/top/artists', {
-        method: 'GET',
-        headers: {
-            'Authorization': 'Bearer ' + access_token
-        }
-    })
-    const data = await response.json()
-    return data;
-}
-
-var getTopArtistTracks = async function (topArtist) {
-    // let topArtistTracks = []
-    // let options = {
-    //     url: `https://api.spotify.com/v1/artists/${topArtist}/top-tracks?market=IN`,
-    //     headers: {
-    //         'Authorization': 'Bearer ' + access_token
-    //     },
-    //     json: true
-    // };
-    const response = await fetch(`https://api.spotify.com/v1/artists/${topArtist}/top-tracks?market=IN`, {
-        method: 'GET',
-        headers: {
-            'Authorization': 'Bearer ' + access_token
-        }
-    })
-    const data = await response.json()
-    return data;
-    // console.log('Artist tracks');
-    // return topArtistTracks
-}
-
-async function getPlaylistData() {
-    topTracks = []
-    topArtists = []
-    topArtistTracks = []
-
-    await getTopTracks().then((data) => {
-        let arr = data.items;
-        for (let i = 0; i < arr.length; i++) {
-            topTracks.push(arr[i].id);
-        }
-    })
-
-    await getTopArtists().then((data) => {
-        let arr = data.items;
-        for (let i = 0; i < arr.length; i++) {
-            topArtists.push(arr[i].id);
-        }
-    })
-
-    for (let i = 0; i < topArtists.length; i++) {
-        await getTopArtistTracks(topArtists[i]).then((data) => {
-            let topArtistTracksArr = data.tracks;
-            // console.log(topArtistTracks[0].id);
-            // topArtistTracks.push(topArtistTracksArr[0].id);
-            for (let j = 0; j < topArtistTracksArr.length; j++) {
-                if (!(topArtistTracksArr[j].id in topTracks)) {
-                    topTracks.push(topArtistTracksArr[j].id);
-                }
-                topArtistTracks.push(topArtistTracksArr[j].id);
-            }
-        });
-    }
-    return {
-        topTracks,
-        topArtists,
-        topArtistTracks
-    };
-}
-
-app.use(express.urlencoded({
-    extended: true
-}))
-app.use(express.json());
-
-app.use(express.static(path.join(__dirname, 'public')))
-    .use(cors())
-    .use(cookieParser())
+// var access_token = ''
+// var refresh_token = ''
+// var expires_in = ''
+var moods = ''
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+app.use(express.static('public'));
+app.use(express.urlencoded({
+    extended: false
+}));
+app.use(express.json());
 
-// app.get('/', (req, res) => {
-//     // res.render('home');
-//     res.send('Home');
-// })
-
-// app.post('/', (req, res) => {
-//     var dataArr = []
-//     const python = spawn('python', ['catchEmotion.py']);
-//     python.stdout.on('data', function (data) {
-//         console.log('Pipe data from python script...');
-//         dataArr.push(data);
-//     });
-
-//     python.on('close', (code) => {
-//         console.log(`child process close all stdio with code ${code}`);
-//         var moodObj = {
-//             dataArr
-//         };
-//         MongoClient.connect(uri,{useUnifiedTopology: true, useNewUrlParser: true, useCreateIndex: true },function(err,db){
-//             if(err) throw err;
-//             var dbo = db.db("moodspotify");
-//         dbo.collection("mood").drop();
-//         dbo.createCollection("mood");
-//         dbo.collection("mood").insertOne(moodObj, function(err,res){
-//             if(err) throw err;
-//             console.log("Number of documents inserted: " + res.insertedCount);
-//             db.close();
-//         });
-//         });
-//         console.log(dataArr);
-//         console.log(moodObj);
-//         res.render('player', {
-//             track,
-//             dataArr,
-//         })
-//     })
-// })
+app.get('/', (req, res) => {
+    res.render('home');
+    // res.redirect('/login');
+})
 
 app.get('/login', (req, res) => {
-    let state = generateRandomString(16);
-    res.cookie(stateKey, state);
-
-    let scope = 'user-read-private user-read-email user-read-playback-state user-top-read user-read-email user-library-read playlist-read-collaborative playlist-modify-private user-follow-read user-read-playback-state user-read-currently-playing playlist-read-private user-library-modify playlist-modify-public ugc-image-upload user-follow-modify user-modify-playback-state user-read-recently-played';
-    res.redirect('https://accounts.spotify.com/authorize?' +
-        querystring.stringify({
-            response_type: 'code',
-            client_id: client_id,
-            client_secret: client_secret,
-            scope: scope,
-            redirect_uri: redirect_uri,
-            state: state,
-        })
-    );
+    res.redirect(spotifyApi.createAuthorizeURL(scopes));
 });
 
+app.get('/callback', (req, res) => {
+    const error = req.query.error;
+    const code = req.query.code;
+    const state = req.query.state;
 
-app.get('/callback', function (req, res) {
-
-    // your application requests refresh and access tokens
-    // after checking the state parameter
-
-    var code = req.query.code || null;
-    var state = req.query.state || null;
-    var storedState = req.cookies ? req.cookies[stateKey] : null;
-
-    if (state === null || state !== storedState) {
-        res.redirect('/#' +
-            querystring.stringify({
-                error: 'state_mismatch'
-            }));
-    } else {
-        res.clearCookie(stateKey);
-        var authOptions = {
-            url: 'https://accounts.spotify.com/api/token',
-            form: {
-                code: code,
-                redirect_uri: redirect_uri,
-                grant_type: 'authorization_code'
-            },
-            headers: {
-                'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
-            },
-            json: true
-        };
-
-        request.post(authOptions, function (error, response, body) {
-            if (!error && response.statusCode === 200) {
-
-                access_token = body.access_token
-                refresh_token = body.refresh_token;
-
-                var options = {
-                    url: 'https://api.spotify.com/v1/me/',
-                    headers: {
-                        'Authorization': 'Bearer ' + access_token
-                    },
-                    json: true
-                };
-
-                // use the access token to access the Spotify Web API
-                request.get(options, function (error, response, body) {
-                    // console.log(body);
-                    // track.push(body.item.name)
-                    // track = body.item.name
-                    // console.log(track);
-                });
-
-
-
-                // we can also pass the token to the browser to make requests from there
-                // res.redirect('/#' +
-                //   querystring.stringify({
-                //     access_token: access_token,
-                //     refresh_token: refresh_token
-                //   }));
-                // res.send({
-                //     access_token: access_token,
-                //     refresh_token: refresh_token,
-                // });
-                res.render('home', {
-                    access_token,
-                    refresh_token
-                })
-            } else {
-                res.redirect('/#' +
-                    querystring.stringify({
-                        error: 'invalid_token'
-                    }));
-            }
-        });
+    if (error) {
+        console.error('Callback Error:', error);
+        res.send(`Callback Error: ${error}`);
+        return;
     }
-});
 
-app.get('/refresh_token', function (req, res) {
+    spotifyApi
+        .authorizationCodeGrant(code)
+        .then(data => {
+            const access_token = data.body['access_token'];
+            const refresh_token = data.body['refresh_token'];
+            const expires_in = data.body['expires_in'];
 
-    // requesting access token from refresh token
-    var refresh_token = req.query.refresh_token;
-    var authOptions = {
-        url: 'https://accounts.spotify.com/api/token',
-        headers: {
-            'Authorization': 'Basic ' + (new Buffer(client_id + ':' + client_secret).toString('base64'))
-        },
-        form: {
-            grant_type: 'refresh_token',
-            refresh_token: refresh_token
-        },
-        json: true
-    };
+            spotifyApi.setAccessToken(access_token);
+            spotifyApi.setRefreshToken(refresh_token);
 
-    request.post(authOptions, function (error, response, body) {
-        if (!error && response.statusCode === 200) {
-            var access_token = body.access_token;
-            res.send({
-                'access_token': access_token
-            });
-        }
-    });
-});
+            console.log('access_token:', access_token);
+            console.log('refresh_token:', refresh_token);
 
-app.get('/playlist', (req, res) => {
-    var spawn = require('child_process').spawn;
-py = spawn('python',['catchEmotion.py']);
-var moods = ''
-py.stdout.on('data', function(data){
-    const daa = data
-    moods += (daa.toString('utf8'));
-});
-py.stdout.on('end', function(){
-    console.log('Sum of numbers=',moods);
-    getPlaylistData().then(({
-        topTracks,
-        topArtists,
-        topArtistTracks
-    }) => {
-        // console.log(topTracks.length)
-        // console.log(topArtists.length)
-        // console.log(topArtistTracks.length)
-        // console.log(topTracks)
-        var outjson = []
-        var queryIds = ''
-        for (let i = 0; i < Math.min(100, topTracks.length); i++) {
-            queryIds = queryIds + (queryIds ? '%2C' + topTracks[i] : topTracks[i]);
-        }
-        console.log(queryIds);
-        fetch(`https://api.spotify.com/v1/audio-features?ids=${queryIds}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Bearer ' + access_token
-                }
-            })
-            .then(data => data.json())
-            .then(json => {
-                const trackFeatures = json.audio_features;
+            console.log(
+                `Sucessfully retreived access token. Expires in ${expires_in} s.`
+            );
+            // res.send('Success! You can now close the window.');
+            // res.redirect('/playlist')
+            res.redirect('/create');
 
-                trackFeatures.forEach(trackFeature => {
-                    const {
-                        danceability,
-                        energy,
-                        valence,
-                        id
-                    } = trackFeature;
-                    // console.log(danceability, energy, valence, id);
-                    var trackFeatureJson = {
-                        danceability: danceability,
-                        energy: energy,
-                        valence: valence,
-                        _id: id
-                    }
+            setInterval(async () => {
+                const data = await spotifyApi.refreshAccessToken();
+                const access_token = data.body['access_token'];
 
-                    outjson.push(trackFeatureJson)
-                    outjson = outjson.filter((obj,index,self) => 
-                        index === self.findIndex((t) => (
-                            t._id === obj._id
-                        ))
-                    )
-
-                    if(moods.charAt(0)==='1'){
-                        if(moods.charAt(2)==='1'){
-                            outjson = outjson.filter(function(el){
-                                return el.valence>=0.6975 &&
-                                    el.danceability>=0.6825 &&
-                                    el.energy>=0.6375;
-    
-                            });
-                        }
-                        else if (moods.charAt(2)==='2') {
-                            outjson = outjson.filter(function(el){
-                                return el.valence>=0.6975 &&
-                                    el.danceability<=0.35 &&
-                                    el.energy<=0.35;
-    
-                            });
-                        } else {
-                            outjson = outjson.filter(function(el){
-                                return el.valence>0.6975 &&
-                                    el.danceability>0.25 &&
-                                    el.danceability<0.75 &&
-                                    el.energy>0.25 &&
-                                    el.energy<0.75;
-    
-                            });
-                        }
-                    }
-                    else if (moods.charAt(0)==='2') {
-                        if(moods.charAt(2)==='1'){
-                            outjson = outjson.filter(function(el){
-                                return el.valence<0.35 &&
-                                    el.danceability>=0.6825 &&
-                                    el.energy>=0.6375;
-    
-                            });
-                        }
-                        else if (moods.charAt(2)==='2') {
-                            outjson = outjson.filter(function(el){
-                                return el.valence<0.35 &&
-                                    el.danceability<=0.35 &&
-                                    el.energy<=0.35;
-    
-                            });
-                        } else {
-                            outjson = outjson.filter(function(el){
-                                return el.valence<0.35 &&
-                                    el.danceability>0.25 &&
-                                    el.danceability<0.75 &&
-                                    el.energy>0.25 &&
-                                    el.energy<0.75;
-    
-                            });
-                        }
-                    } else {
-                        if(moods.charAt(2)==='1'){
-                            outjson = outjson.filter(function(el){
-                                return el.valence>0.25 &&
-                                    el.valence<0.75 &&
-                                    el.danceability>=0.6825 &&
-                                    el.energy>=0.6375;
-    
-                            });
-                        }
-                        else if (moods.charAt(2)==='2') {
-                            outjson = outjson.filter(function(el){
-                                return el.valence>0.25 &&
-                                    el.valence<0.75 &&
-                                    el.danceability<=0.35 &&
-                                    el.energy<=0.35;
-    
-                            });
-                        } else {
-                            outjson = outjson.filter(function(el){
-                                return el.valence>0.25 &&
-                                    el.valence<0.75 &&
-                                    el.danceability>0.25 &&
-                                    el.danceability<0.75 &&
-                                    el.energy>0.25 &&
-                                    el.energy<0.75;
-    
-                            });
-                        }
-                    }
-                })
-                console.log(JSON.stringify(outjson));
-                MongoClient.connect(uri,{useUnifiedTopology: true, useNewUrlParser: true, useCreateIndex: true },function(err,db){
-                    if(err) throw err;
-                    var dbo = db.db("moodspotify");
-                    dbo.collection("songs").drop();
-                    dbo.createCollection("songs");
-                    dbo.collection("songs").insertMany(outjson, function(err,res){
-                        if(err) throw err;
-                        console.log("Number of documents inserted: " + res.insertedCount);
-                        console.log(moods.charAt(0));
-                        console.log(moods.charAt(2));
-                        db.close();
-                    });
-                });
-                res.render('playlist', {
-                    tracks: outjson
-                })
-            });
-
-    })
-});
-    
-})
-
-app.get('/player',(req,res) =>{
-    MongoClient.connect(uri,{useUnifiedTopology: true, useNewUrlParser: true, useCreateIndex: true },function(err,db){
-        if(err) throw err;
-        var dbo = db.db("moodspotify");
-        dbo.collection("songs").find({}).toArray(function(err, result) {
-          if (err) throw err;
-          var playlistCreated = [];
-          var x;
-          for( x in result ) {
-            var y = "spotify:track:"
-            y+=result[x]._id
-            playlistCreated.push(y);
-          };
-          uris ={"uris":playlistCreated};
-          console.log(JSON.stringify(uris));
-          //getUserId();
-          //postPlaylist();
-          //postedSongs(uris);
-          res.render('player');
-          db.close();
+                console.log('The access token has been refreshed!');
+                console.log('access_token:', access_token);
+                spotifyApi.setAccessToken(access_token);
+            }, expires_in / 2 * 1000);
+        })
+        .catch(error => {
+            console.error('Error getting Tokens:', error);
+            res.send(`Error getting Tokens: ${error}`);
         });
+});
+
+app.get('/create', (req, res) => {
+    res.render('create');
+})
+
+app.get('/playlist', async (req, res) => {
+    const userid = await getMyData();
+    console.log(userid);
+    var topTracks = [];
+    var trackFeatures = [];
+    // var x = 0;
+    // for (x = 0; x < 50; x++) {
+    // topTracks.push(await getTopTracks(x));
+    // console.log(x);
+    // }
+    topTracks = await getTopTracks();
+    console.log(topTracks.length, ' users top tracks')
+    var topArtists = await getTopArtists();
+    console.log(topArtists.length, ' users top artists');
+    for (artist of topArtists) {
+        // console.log('For artist: ', artist);
+        topTracks = await getTopArtistTracks(artist, topTracks);
+    }
+    console.log(topTracks.length, `users top artist's tracks`);
+    // for (track of topTracks) {
+    //     trackFeatures = await getTrackFeat(track, trackFeatures);
+    // }
+    for (let i = 0; i < topTracks.length; i += 100) {
+        let trackIds = topTracks.slice(i, Math.min(topTracks.length, i + 100));
+        trackFeatures = await getTrackFeat(trackIds, trackFeatures);
+    }
+    console.log(trackFeatures.length, ' number of tracks with features');
+    // res.send('OK');
+    // for (track in topTracks) {
+    //     trackFeatures.push(await getTrackFeat(track));
+    //     console.log(`----------------${track}-------------------------`)
+    //     console.log(track);
+    // }
+    // console.log(trackFeatures);
+    const playlistname = await generateTime();
+    const playlistid = await createMyPlaylist(playlistname, {
+        'description': playlistname,
+        'public': false
+    })
+    console.log(playlistid);
+    trackURIs = []
+    aftersorttracks = trackFeatures;
+    py = spawn('python', ['catchEmotion.py']);
+    // var moods = "";
+    // var moods = [];
+    // var moodstemp = "";
+    moods = "";
+    py.stdout.on('data', function (data) {
+        console.log('Pipe data from python script ...');
+        var daa = data;
+        moods += (daa.toString('utf8'));
+        // moods.push(data);
+    });
+    py.stdout.on('end', function () {
+        // moods = moodstemp;
+        console.log('Moods', moods, moods.length);
+        aftersorttracks = sortByValence(aftersorttracks);
+        // console.log(aftersorttracks.length, ' : ', aftersorttracks);
+        aftersorttracks = sortByDanceabilityAndEnergy(aftersorttracks);
+        // console.log(aftersorttracks.length, ' : ', aftersorttracks);
+        for (track of aftersorttracks) {
+            trackURIs.push(track.uri);
+        }
+        console.log(aftersorttracks.length, ' no of selected tracks');
+        for (let i = 0; i < trackURIs.length; i += 100) {
+            let trackURIsliced = trackURIs.slice(i, Math.min(trackURIs.length, i + 100));
+            addTracksToPlaylist(playlistid, trackURIsliced);
+        }
+        // addTracksToPlaylist(playlistid, trackURIs);
+        // res.send(`On playlist route ${playlistid}`);
+        res.render('player', {
+            playlistid
+        })
     });
 })
 
-app.listen(8888, () => {
-    console.log('Listening on port 8888');
-})
+// app.get('/play', (req, res) => {
+//     res.send('Playing');
+// })
+
+async function generateTime() {
+    let date_ob = new Date();
+
+    // current date
+    // adjust 0 before single digit date
+    let date = ("0" + date_ob.getDate()).slice(-2);
+
+    // current month
+    let month = ("0" + (date_ob.getMonth() + 1)).slice(-2);
+
+    // current year
+    let year = date_ob.getFullYear();
+
+    // current hours
+    let hours = date_ob.getHours();
+
+    // current minutes
+    let minutes = date_ob.getMinutes();
+
+    // current seconds
+    let seconds = date_ob.getSeconds();
+
+    return year + "-" + month + "-" + date + " " + hours + ":" + minutes + ":" + seconds;
+}
+
+async function getMyData() {
+    try {
+        const myData = await spotifyApi.getMe();
+        // console.log(myData.body);
+        return myData.body.id;
+    } catch (e) {
+        console.log(e);
+        return '';
+    }
+}
+async function getTrackFeat(topTracks, trackFeatures) {
+    try {
+        // let trackFeatures = []
+        // const data = await spotifyApi.getAudioFeaturesForTrack(x.id);
+        const data = await spotifyApi.getAudioFeaturesForTracks(topTracks);
+        const tracks = data.body.audio_features;
+        // console.log(tracks);
+        for (track of tracks) {
+            if (track === null) {
+                continue;
+            }
+            const {
+                uri,
+                valence,
+                danceability,
+                energy
+            } = track;
+            // console.log(uri, valence, danceability, energy);
+            trackFeatures.push({
+                uri: uri,
+                valence: valence,
+                danceability: danceability,
+                energy: energy
+            })
+        }
+        return trackFeatures;
+        // const {
+        //     uri,
+        //     valence,
+        //     danceability,
+        //     energy
+        // } = data.body;
+        // topTracks = {
+        //     uri: uri,
+        //     valence: valence,
+        //     danceability: danceability,
+        //     energy: energy
+        // };
+        // return topTracks
+    } catch (e) {
+        console.log(e);
+        // return []
+        return trackFeatures;
+    }
+}
+async function getTopTracks() {
+    try {
+        let topTracks = []
+        const data = await spotifyApi.getMyTopTracks({
+            limit: 50
+        });
+        data.body.items.forEach(track => {
+            const {
+                id,
+                uri
+            } = track;
+            topTracks.push({
+                id: id,
+                uri: uri
+            })
+        })
+        return topTracks
+    } catch (e) {
+        console.log(e);
+        return []
+    }
+}
+
+async function createMyPlaylist(name, options) {
+    try {
+        let playlistid = ''
+        const playlistDetails = await spotifyApi.createPlaylist(name, options);
+        playlistid = playlistDetails.body.id;
+        return playlistid;
+    } catch (e) {
+        console.log(e);
+        return '';
+    }
+}
+
+function addTracksToPlaylist(playlistid, trackURIs) {
+    spotifyApi.addTracksToPlaylist(playlistid, trackURIs)
+        .then(data => console.log(data))
+        .catch(e => console.log(e));
+}
+
+async function getTopArtists() {
+    try {
+        const data = await spotifyApi.getMyTopArtists({
+            limit: 50,
+            time_range: 'long_term',
+        });
+        const artists = data.body.items;
+        var topArtists = []
+        artists.forEach(artist => {
+            topArtists.push(artist.id);
+        })
+        return topArtists;
+    } catch (e) {
+        console.log(e);
+        return [];
+    }
+}
+
+async function getTopArtistTracks(topArtist, topTracks) {
+    // spotifyApi.getArtistTopTracks(topArtist, 'IN')
+    //     .then(data => console.log(data.body))
+    //     .catch(e => console.log(e));
+    try {
+        const data = await spotifyApi.getArtistTopTracks(topArtist, 'IN');
+        const tracks = data.body.tracks;
+        for (track of tracks) {
+            topTracks.push(track.id);
+        }
+        return topTracks;
+    } catch (e) {
+        console.log(e);
+        return topTracks;
+    }
+}
+
+function sortByValence(x) {
+    if (moods.charAt(0) === '1') {
+        x = x.filter(function (el) {
+            return el.valence >= 0.55
+        })
+    } else if (moods.charAt(0) === '2') {
+        x = x.filter(function (el) {
+            return el.valence < 0.45
+        })
+    } else {
+        x = x.filter(function (el) {
+            return el.valence > 0.35 &&
+                el.valence < 0.65
+        })
+    }
+    return x;
+}
+
+function sortByDanceabilityAndEnergy(x) {
+    if (moods.charAt(2) === '1') {
+        x = x.filter(function (el) {
+            return el.danceability >= 0.55 && el.energy >= 0.55;
+        })
+    } else if (moods.charAt(2) === '2') {
+        x = x.filter(function (el) {
+            return el.danceability < 0.45 &&
+                el.energy < 0.45;
+        })
+    } else {
+        x = x.filter(function (el) {
+            return el.danceability > 0.35 &&
+                el.danceability < 0.65 &&
+                el.energy > 0.35 &&
+                el.energy < 0.65
+        })
+    }
+    return x;
+}
+
+
+
+// app.listen(8888, () => {
+//     console.log('Listening on port 8888');
+// })
+
+app.listen(8888, () =>
+    console.log(
+        'HTTP Server up. Now go to http://localhost:8888/ in your browser.'
+    )
+);
