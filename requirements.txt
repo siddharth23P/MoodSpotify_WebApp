@@ -1,8 +1,9 @@
 cmake
 dlib
 numpy
-panda
+pandas
 tensorflow
 requests 
 imutils
 scipy
+opencv-python
