@@ -1,3 +1,5 @@
+// Requiring packages needed
+
 const SpotifyWebApi = require('spotify-web-api-node');
 const express = require('express')
 const {
@@ -9,6 +11,7 @@ const {
 const path = require('path');
 const app = express()
 
+// Scopes define the permissions the user needs to provide the app
 const scopes = [
     'ugc-image-upload',
     'user-read-playback-state',
@@ -31,34 +34,37 @@ const scopes = [
     'user-follow-modify'
 ];
 
+// Instantiating the SpotifyWebApi object using constructor
 const spotifyApi = new SpotifyWebApi({
     redirectUri: 'http://localhost:8888/callback',
     clientId: process.env.client_id,
-    clientSecret: process.env.client_secret,'
+    clientSecret: process.env.client_secret,
 });
 
-// var access_token = ''
-// var refresh_token = ''
-// var expires_in = ''
 var moods = ''
 
+// Setting view engine of expres app to ejs
 app.set('view engine', 'ejs');
+// Setting the default views folder
 app.set('views', path.join(__dirname, 'views'));
+// Serving static files of public folder
 app.use(express.static('public'));
 app.use(express.urlencoded({
     extended: false
 }));
 app.use(express.json());
 
+// Home route
 app.get('/', (req, res) => {
     res.render('home');
-    // res.redirect('/login');
 })
 
+// Login route which then redirects to the authentication page
 app.get('/login', (req, res) => {
     res.redirect(spotifyApi.createAuthorizeURL(scopes));
 });
 
+// The default redirect route specified in the dashboard of Spotify Web API on successful authentication
 app.get('/callback', (req, res) => {
     const error = req.query.error;
     const code = req.query.code;
@@ -86,8 +92,6 @@ app.get('/callback', (req, res) => {
             console.log(
                 `Sucessfully retreived access token. Expires in ${expires_in} s.`
             );
-            // res.send('Success! You can now close the window.');
-            // res.redirect('/playlist')
             res.redirect('/create');
 
             setInterval(async () => {
@@ -105,18 +109,31 @@ app.get('/callback', (req, res) => {
         });
 });
 
+// 'Create' route after successfully obtaining the access token and refresh token
 app.get('/create', (req, res) => {
     res.render('create');
 })
 
+/*  Route for creating a playlist by obtaining user id, then from that user id
+    the user's top tracks are obtained along with top artists. Then each
+    artist's top 10 tracks are obtained and all of them are used for generating
+    a playlist by determining the mood using a pre-trained model for detecting
+    emotions in a python script run using spawn and filtering the tracks based
+    on it.
+*/
 app.get('/playlist', async (req, res) => {
     const userid = await getMyData();
     console.log(userid);
     var topTracks = [];
     var trackFeatures = [];
-    topTracks = await getTopTracks();
+    var topArtists = [];
+    topTracks = await getTopTracks('short_term');
+    topTracks.push(...await getTopTracks('medium_term'));
+    topTracks.push(...await getTopTracks('long_term'));
     console.log(topTracks.length, ' users top tracks')
-    var topArtists = await getTopArtists();
+    topArtists = await getTopArtists('short_term');
+    topArtists.push(...await getTopArtists('medium_term'));
+    topArtists.push(...await getTopArtists('long_term'));
     console.log(topArtists.length, ' users top artists');
     for (artist of topArtists) {
         topTracks = await getTopArtistTracks(artist, topTracks);
@@ -160,6 +177,7 @@ app.get('/playlist', async (req, res) => {
     });
 })
 
+// Generating random name for playlist
 async function generateTime() {
     let date_ob = new Date();
     let date = ("0" + date_ob.getDate()).slice(-2);
@@ -171,6 +189,7 @@ async function generateTime() {
     return year + "-" + month + "-" + date + " " + hours + ":" + minutes + ":" + seconds;
 }
 
+// Function to make calls to get user information
 async function getMyData() {
     try {
         const myData = await spotifyApi.getMe();
@@ -180,6 +199,8 @@ async function getMyData() {
         return '';
     }
 }
+
+// Function to make call to get features of tracks, like valence, danceability and energy
 async function getTrackFeat(topTracks, trackFeatures) {
     try {
         const data = await spotifyApi.getAudioFeaturesForTracks(topTracks);
@@ -202,18 +223,21 @@ async function getTrackFeat(topTracks, trackFeatures) {
             })
         }
         return trackFeatures;
-       
+
     } catch (e) {
         console.log(e);
- 
+
         return trackFeatures;
     }
 }
-async function getTopTracks() {
+
+// Function to make call to get a user's top 50 tracks, term maybe long term, medium term or short term
+async function getTopTracks(term) {
     try {
         let topTracks = []
         const data = await spotifyApi.getMyTopTracks({
-            limit: 50
+            limit: 50,
+            time_range: term
         });
         data.body.items.forEach(track => {
             const {
@@ -232,6 +256,7 @@ async function getTopTracks() {
     }
 }
 
+// Function to make call to create a new empty playlist
 async function createMyPlaylist(name, options) {
     try {
         let playlistid = ''
@@ -244,17 +269,19 @@ async function createMyPlaylist(name, options) {
     }
 }
 
+// Function to make call to add tracks to a specific playlist given by its id
 function addTracksToPlaylist(playlistid, trackURIs) {
     spotifyApi.addTracksToPlaylist(playlistid, trackURIs)
         .then(data => console.log(data))
         .catch(e => console.log(e));
 }
 
-async function getTopArtists() {
+// Function to make call to get top 50 artists of a user, term may be long term, medium term or short term
+async function getTopArtists(term) {
     try {
         const data = await spotifyApi.getMyTopArtists({
             limit: 50,
-            time_range: 'long_term',
+            time_range: term,
         });
         const artists = data.body.items;
         var topArtists = []
@@ -268,8 +295,9 @@ async function getTopArtists() {
     }
 }
 
+// Function to make call to get 10 tracks of a specified artist
 async function getTopArtistTracks(topArtist, topTracks) {
-  
+
     try {
         const data = await spotifyApi.getArtistTopTracks(topArtist, 'IN');
         const tracks = data.body.tracks;
@@ -283,6 +311,7 @@ async function getTopArtistTracks(topArtist, topTracks) {
     }
 }
 
+// Function to filter tracks based on valence
 function sortByValence(x) {
     if (moods.charAt(0) === '1') {
         x = x.filter(function (el) {
@@ -301,6 +330,7 @@ function sortByValence(x) {
     return x;
 }
 
+// Function to filter tracks based on danceability and energy
 function sortByDanceabilityAndEnergy(x) {
     if (moods.charAt(2) === '1') {
         x = x.filter(function (el) {
