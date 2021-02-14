@@ -130,10 +130,12 @@ app.get('/playlist', async (req, res) => {
     topTracks = await getTopTracks('short_term');
     topTracks.push(...await getTopTracks('medium_term'));
     topTracks.push(...await getTopTracks('long_term'));
+    topTracks = [...new Set(topTracks)];
     console.log(topTracks.length, ' users top tracks')
     topArtists = await getTopArtists('short_term');
     topArtists.push(...await getTopArtists('medium_term'));
     topArtists.push(...await getTopArtists('long_term'));
+    topArtists = [...new Set(topArtists)];
     console.log(topArtists.length, ' users top artists');
     for (artist of topArtists) {
         topTracks.push(...await getTopArtistTracks(artist));
