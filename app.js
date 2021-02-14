@@ -136,8 +136,9 @@ app.get('/playlist', async (req, res) => {
     topArtists.push(...await getTopArtists('long_term'));
     console.log(topArtists.length, ' users top artists');
     for (artist of topArtists) {
-        topTracks = await getTopArtistTracks(artist, topTracks);
+        topTracks.push(...await getTopArtistTracks(artist));
     }
+    topTracks = [...new Set(topTracks)];
     console.log(topTracks.length, `users top artist's tracks`);
     for (let i = 0; i < topTracks.length; i += 100) {
         let trackIds = topTracks.slice(i, Math.min(topTracks.length, i + 100));
@@ -296,9 +297,9 @@ async function getTopArtists(term) {
 }
 
 // Function to make call to get 10 tracks of a specified artist
-async function getTopArtistTracks(topArtist, topTracks) {
-
+async function getTopArtistTracks(topArtist) {
     try {
+        var topTracks = []
         const data = await spotifyApi.getArtistTopTracks(topArtist, 'IN');
         const tracks = data.body.tracks;
         for (track of tracks) {
@@ -307,7 +308,7 @@ async function getTopArtistTracks(topArtist, topTracks) {
         return topTracks;
     } catch (e) {
         console.log(e);
-        return topTracks;
+        return [];
     }
 }
 
