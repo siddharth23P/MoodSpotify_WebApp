@@ -4,11 +4,11 @@
 
 Open .env and add your client_id and client_secret from Spotify developer dashboard
 
-$pip insall -r requirements.txt
-
-$npm install
-
-$node app.js
+```bash
+pip insall -r requirements.txt
+npm install
+node app.js
+```
 
 Open https://localhost::8888/
 
